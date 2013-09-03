@@ -20,50 +20,33 @@
       threshold: 1,
       label_more: 'more',
       label_less: 'less',
+      observe: '',
       show: function (el) {
         $(el).fadeIn('slow');
       },
       hide: function (el) {
         $(el).hide();
-      }
+      },
+      after_update: null
     },
     
+    /**
+     * Constructor for this widget.
+     */
     _create: function() {
       var self = this;
       var wrapper = this.element;
       var o = self.options;
-
-      var checked = 0;
-      $(wrapper).find(o.element_inner).each(function() {
-        if ($(this).attr(o.attribute) == o.value) {
-          checked++;
-        }
-      });
-
-      if (self.countSelected() > 0 && self.countSelected() < o.threshold) {
-        return;
-      }
-
-      if (self.countSelected() == 0) {
-        self.addLink({
-          type: 'less',
-          label: o.label_less,
-          click: 'reduceOptions'
-        });
-      }
-      else if (self.countElements() > self.countSelected()) {
-        // hide the unselected options
-        $(wrapper).find(o.element_inner + '[' + o.attribute + '!="' + o.value + '"]').each(function() {
-          $(this).parent(o.element_outer).hide();
-        });
-        self.addLink({
-          type: 'more',
-          label: o.label_more,
-          click: 'expandOptions'
-        });
-      }
       
-      self.verifyLinkVisibility();
+      self.options.wrapper = wrapper;
+      
+      if (o.observe) {
+        $(document).on(o.observe, function() {
+          self.update();
+        });
+      }
+
+      self.update();
       
       self._on($(wrapper).find(o.element_inner), {
         change: 'verifyLinkVisibility'
@@ -71,6 +54,9 @@
 
     },
 
+    /**
+     * Count all relevant elements in this set.
+     */
     countElements: function() {
       var self = this;
       var wrapper = self.element;
@@ -78,6 +64,9 @@
       return $(wrapper).find(o.element_inner).length;
     },
 
+    /**
+     * Count the selected elements in the current set.
+     */
     countSelected: function() {
       var self = this;
       var wrapper = self.element;
@@ -91,55 +80,86 @@
       return checked;
     },
 
+    /**
+     * See if and which toggle links should be visible.
+     */
     verifyLinkVisibility: function() {
       var self = this;
       var o = self.options;
       var count = self.countElements();
       var selected = self.countSelected();
-      if (selected == 0 || count == selected) {
+      if ((selected == 0 && !self.collapsed) || count == selected) {
         $(self.element).find('.ui-reduce-options-button').hide();
       }
       else {
         $(self.element).find('.ui-reduce-options-button').show();
       }
     },
-
-    // less is clicked
-    reduceOptions: function(e) {
-      var element = e.currentTarget;
-      var unchecked = 0;
+    
+    /**
+     * Show all elements in the set.
+     */
+    showAll: function() {
+      var self = this;
+      // make sure all are visible
+      $(self.options.wrapper).find(self.options.element_inner).each(function() {
+        self.options.show($(this).parent(self.options.element_outer));
+      });
+    },
+    
+    /**
+     * Hide all elements in the set.
+     */
+    hideAll: function() {
+      var self = this;
+      // make sure all are visible
+      $(self.options.wrapper).find(self.options.element_inner).each(function() {
+        self.options.hide($(this).parent(self.options.element_outer));
+      });
+    },
+    
+    /**
+     * Hide all unselected elements in the current set.
+     */
+    hideUnselected: function() {
       var self = this;
       var o = self.options;
       $(self.element).find(o.element_inner + '[' + o.attribute + '!="' + o.value + '"]').each(function() {
         o.hide($(this).parent(o.element_outer));
       });
-      self.addLink({
-        type: 'more',
-        label: o.label_more,
-        click: 'expandOptions'
-      });
+    },
+    
+    /**
+     * Reduce elements in given set.
+     * The argument e is an event object.
+     */
+    reduceOptions: function(e) {
+      this.hideUnselected();
+      this.addMoreLink();
+      this.collapsed = true;
       e.preventDefault();
       return false;
     },
 
-    // more is clicked
+    /**
+     * Expand elements in given set.
+     * The argument e is an event object.
+     */
     expandOptions: function(e) {
-      var element = e.currentTarget;
-      var self = this;
-      var o = self.options;
-      o.show($(self.element).find(o.element_outer));
-      self.addLink({
-        type: 'less',
-        label: o.label_less,
-        click: 'reduceOptions'
-      });
+      this.showAll();
+      this.removeLink();
+      this.addLessLink();
+      this.collapsed = false;
+      this.verifyLinkVisibility();
       e.preventDefault();
       return false;
     },
     
-    // add a link to show/hide unselected options
+    /**
+     * Link builder helper function.
+     */
     addLink: function(props) {
-      $(this.element).find('.ui-reduce-options-button').remove();
+      this.removeLink();
       var link = $('<a>').attr({
         'class': 'ui-reduce-options-button ui-reduce-options-show-' + props.type,
         'href': '#',
@@ -149,6 +169,59 @@
         click: props.click
       });
       $(this.element).append(link);
+    },
+    
+    /**
+     * Remove the mode/less link.
+     */
+    removeLink: function() {
+      $(this.element).find('.ui-reduce-options-button').remove();
+    },
+    
+    /**
+     * Add a "more" link.
+     */
+    addMoreLink: function() {
+      this.addLink({
+        type: 'more',
+        label: this.options.label_more,
+        click: 'expandOptions'
+      });
+    },
+    
+    /**
+     * Add a "less" link.
+     */
+    addLessLink: function() {
+      this.addLink({
+        type: 'less',
+        label: this.options.label_less,
+        click: 'reduceOptions'
+      });
+    },
+    
+    /**
+     * Update the current element set.
+     */
+    update: function() {
+      var self = this;
+      var wrapper = this.element;
+      var o = self.options;
+      if (self.countSelected() == 0) {
+        self.showAll();
+        self.addLessLink();
+        self.collapsed = false;
+      }
+      else if (self.countElements() > self.countSelected()) {
+        // hide the unselected options
+        self.hideUnselected();
+        self.collapsed = true;
+        self.addMoreLink();
+      }
+      self.verifyLinkVisibility();
+      if (o.after_update) {
+        o.after_update(self);
+      }
     }
     
   });
