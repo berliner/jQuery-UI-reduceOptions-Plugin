@@ -24,6 +24,7 @@ var options = {
   }
 };
 $('#element-id').reduceOptions(options);
+```
 
 This would work on markup like the following:
 ```
@@ -38,3 +39,4 @@ This would work on markup like the following:
     <input type="checkbox" name="mycheckbox_3" value="3" />
   </div>
 </div>
+```
