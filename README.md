@@ -2,6 +2,7 @@ jQuery-UI-reduceOptions-Plugin
 ==============================
 
 Simple jQuery UI plugin that acts on grouped elements and allows hiding of unselected ones, toggle included.
+You can see a working example at <a href="https://www.port-of-art.com">https://www.port-of-art.com</a> in the filter section in the left sidebar.
 
 ## Usage
 
